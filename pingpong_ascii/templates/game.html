@@ -1,22 +1,55 @@
 <!doctype html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <title>ASCII Пинг-Понг</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <meta charset="UTF-8" />
+  <title>ASCII Пинг-Понг с JS</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
 </head>
 <body>
-    <h1>ASCII Пинг-Понг</h1>
+  <h1>ASCII Пинг-Понг с JS</h1>
+  <div class="game-container">
+    <div class="score">Счёт: <span id="score">0</span></div>
+    <pre id="field">Загрузка...</pre>
+    <p>Управляй ракеткой с помощью стрелок ↑ и ↓</p>
+  </div>
 
-    <div class="game-container">
-        <div class="score">Счёт: {{ score }}</div>
+  <script>
+    const fieldEl = document.getElementById('field');
+    const scoreEl = document.getElementById('score');
 
-        <pre>{{ field }}</pre>
+    async function fetchState() {
+      const res = await fetch('/api/state');
+      const data = await res.json();
+      fieldEl.textContent = data.field;
+      scoreEl.textContent = data.score;
+    }
 
-        <form method="post">
-            <button name="action" value="up">⬆ Вверх</button>
-            <button name="action" value="down">⬇ Вниз</button>
-        </form>
-    </div>
+    async function sendMove(action) {
+      const res = await fetch('/api/move', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({action})
+      });
+      const data = await res.json();
+      if (data.game_over) {
+        alert('Игра окончена! Твой счёт: ' + data.score);
+        await fetchState();
+      } else {
+        fieldEl.textContent = data.field;
+        scoreEl.textContent = data.score;
+      }
+    }
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'ArrowUp') {
+        sendMove('up');
+      } else if (e.key === 'ArrowDown') {
+        sendMove('down');
+      }
+    });
+
+    // Начальное состояние
+    fetchState();
+  </script>
 </body>
 </html>
