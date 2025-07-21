@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, session
+from flask import Flask, render_template, request, session, jsonify
 import random
 
 app = Flask(__name__)
@@ -31,7 +31,7 @@ def move_ball(state):
             state['ball_dx'] *= -1
             state['score'] += 1
         else:
-            return False  # Пропустил мяч
+            return False  # Промахнулся
 
     # Отскок от правой стены
     if state['ball_x'] >= WIDTH - 2:
@@ -42,7 +42,7 @@ def move_ball(state):
 def render_field(state):
     field = [[' ' for _ in range(WIDTH)] for _ in range(HEIGHT)]
 
-    # Ракетка игрока
+    # Ракетка игрока (3 символа)
     for dy in [-1, 0, 1]:
         y = state['player_y'] + dy
         if 0 <= y < HEIGHT:
@@ -59,30 +59,43 @@ def render_field(state):
     lines.append('+' + '-' * WIDTH + '+')
     return '\n'.join(lines)
 
-@app.route('/', methods=['GET', 'POST'])
-def game():
+@app.route('/')
+def index():
+    return render_template('game.html')
+
+@app.route('/api/state', methods=['GET'])
+def api_state():
     if 'state' not in session:
         session['state'] = init_game()
-
     state = session['state']
-
-    if request.method == 'POST':
-        action = request.form.get('action')
-        if action == 'up':
-            state['player_y'] = max(0, state['player_y'] - 1)
-        elif action == 'down':
-            state['player_y'] = min(HEIGHT - 1, state['player_y'] + 1)
-
-        alive = move_ball(state)
-        if not alive:
-            score = state['score']
-            session.pop('state')
-            return render_template('game.html', field="GAME OVER", score=score)
-
-        session['state'] = state
-
     field = render_field(state)
-    return render_template('game.html', field=field, score=state['score'])
+    return jsonify({
+        'field': field,
+        'score': state['score']
+    })
+
+@app.route('/api/move', methods=['POST'])
+def api_move():
+    if 'state' not in session:
+        session['state'] = init_game()
+    state = session['state']
+    data = request.get_json()
+    action = data.get('action')
+
+    if action == 'up':
+        state['player_y'] = max(0, state['player_y'] - 1)
+    elif action == 'down':
+        state['player_y'] = min(HEIGHT - 1, state['player_y'] + 1)
+
+    alive = move_ball(state)
+    if not alive:
+        score = state['score']
+        session.pop('state')
+        return jsonify({'game_over': True, 'score': score})
+
+    session['state'] = state
+    field = render_field(state)
+    return jsonify({'game_over': False, 'field': field, 'score': state['score']})
 
 if __name__ == '__main__':
     app.run(debug=True)
